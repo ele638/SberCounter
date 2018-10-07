@@ -1,0 +1,21 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="ru.ele638.test.sbercounter.MainActivity">
+    <item
+        android:id="@+id/action_settings"
+        android:orderInCategory="100"
+        android:title="@string/action_settings"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_readSMS"
+        android:orderInCategory="150"
+        android:title="@string/Read_All_SMS"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/action_resetdb"
+        android:orderInCategory="1000"
+        android:title="@string/Erase_DB"
+        app:showAsAction="never" />
+
+</menu>
