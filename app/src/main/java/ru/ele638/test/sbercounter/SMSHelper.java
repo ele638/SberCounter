@@ -1,89 +1,29 @@
 package ru.ele638.test.sbercounter;
 
-import android.app.IntentService;
-import android.app.Service;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
-import android.os.IBinder;
-import android.support.annotation.Nullable;
 import android.util.Log;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.regex.Pattern.compile;
 
-public class SMSService extends IntentService {
-
-    SMSReceiver receiver;
-    SQLHelper dbhelper;
+public class SMSHelper {
 
     final private static String TAG = "SmsServieTag";
 
-    private static SMSService instance = null;
 
-
-    public static boolean isServiceDown() {
-        return instance == null;
-    }
-
-    public static SMSService getInstance() {
-        if (instance == null) {
-            instance = new SMSService();
-        }
-        return instance;
-    }
-
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "Service started");
-        instance = this;
-        dbhelper = new SQLHelper(this);
-        if (!SMSReceiver.isReceiverStarted()) {
-            receiver = new SMSReceiver();
-            registerReceiver(receiver, new IntentFilter("android.provider.Telephony.SMS_RECEIVED"));
-        }
-        if (MainActivity.messages != null) {
-            MainActivity.service = this;
-            MainActivity.messages.clear();
-            MainActivity.messages = getAllMessages();
-            MainActivity.rvAdapter.setMessages(MainActivity.messages);
-            MainActivity.rvAdapter.notifyDataSetChanged();
-        }
-        return super.onStartCommand(intent, flags, startId);
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-
-    @Override
-    protected void onHandleIntent(@Nullable Intent intent) {
-
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        Log.d(TAG, "Service Destroyed");
-        if (receiver != null) unregisterReceiver(receiver);
-    }
-
-    public void processIncomeSMS(String message) {
+    public static void processIncomeSMS(SQLHelper dbHelper, String message) {
         Log.d(TAG, "Got SMS from 900: " + message);
 
-        HashMap<String, Integer> operations = dbhelper.getAllOpers();
+        //HashMap<String, Integer> operations = dbHelper.getAllOpers();
 
         Pattern cardNumber = compile("^([A-Za-z]+\\d+)");
         Pattern dateTime = compile("(\\d+.\\d+.\\d+ \\d+.\\d+)");
@@ -127,53 +67,64 @@ public class SMSService extends IntentService {
             if (matcher.find())
                 newMessage.BALANCE = Double.parseDouble(matcher.group(1));
 
-            if (dbhelper != null) dbhelper.addValue(newMessage);
+            dbHelper.addValue(newMessage);
+            if (MainActivity.getRvAdapter() != null) {
+                addMessage(MainActivity.getRvAdapter(), newMessage);
+            }
         } catch (Exception e) {
-
+            e.printStackTrace();
         }
     }
 
 
-    public ArrayList<Message> getAllMessages() {
-        ArrayList<Message> messages = new ArrayList<>();
-        dbhelper.getAllMessages(messages);
+    public static void getAllMessages(SQLHelper dbHelper, RVAdapter adapter) {
+        ArrayList<Message> messages = RVAdapter.getMessages();
+        dbHelper.getAllMessages(messages);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            messages.sort(new Comparator<Message>() {
-                @Override
-                public int compare(Message message, Message t1) {
-                    return (message.DATETIME == null || t1.DATETIME == null) ?
-                            0 :
-                            t1.DATETIME.compareTo(message.DATETIME);
-                }
-            });
+            if (messages != null) {
+                messages.sort(new Comparator<Message>() {
+                    @Override
+                    public int compare(Message message, Message t1) {
+                        return (message.DATETIME == null || t1.DATETIME == null) ?
+                                0 :
+                                t1.DATETIME.compareTo(message.DATETIME);
+                    }
+                });
+            }
         }
-        return messages;
+        adapter.notifyDataSetChanged();
     }
 
-    public void dropDatabase() {
-        dbhelper.dropDatabase();
+    public static void addMessage(RVAdapter adapter, Message message) {
+        ArrayList<Message> messages = RVAdapter.getMessages();
+        messages.add(0, message);
+        adapter.notifyItemInserted(0);
     }
 
-    public void getLocalMessages() {
+    public static void dropDatabase(SQLHelper dbHelper) {
+        dbHelper.dropDatabase();
+    }
+
+    public static void getLocalMessages(SQLHelper dbHelper) {
         String[] projection = {"address", "body"};
         String selection = "address = \'900\'";
 
-        Cursor cursor = getContentResolver().query(
+        Cursor cursor = dbHelper.getContext().getContentResolver().query(
                 Uri.parse("content://sms/inbox"), projection, selection, null, null);
         if (cursor.moveToFirst()) {
             do {
-                processIncomeSMS(cursor.getString(cursor.getColumnIndex("body")));
+                processIncomeSMS(dbHelper, cursor.getString(cursor.getColumnIndex("body")));
 
             } while (cursor.moveToNext());
         }
         cursor.close();
     }
 
-    public Integer getLocalMessagesCount(){
+    public static Integer getLocalMessagesCount(SQLHelper dbHelper) {
         String[] projection = {"address", "body"};
         String selection = "address = \'900\'";
 
-        Cursor cursor = getContentResolver().query(
+        Cursor cursor = dbHelper.getContext().getContentResolver().query(
                 Uri.parse("content://sms/inbox"), projection, selection, null, null);
         Integer count = cursor.getCount();
         cursor.close();

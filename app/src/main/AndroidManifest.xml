@@ -4,7 +4,9 @@
 
     <!-- To use SMS based services -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.READ_SMS" />
+    <permission
+        android:name="android.permission.READ_SMS"
+        android:protectionLevel="signature" />
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
@@ -28,7 +30,7 @@
 
         <receiver
             android:name=".SMSReceiver"
-            android:enabled="false"
+            android:enabled="true"
             android:exported="true"
             android:permission="android.permission.BROADCAST_SMS">
             <intent-filter android:priority="1000">
@@ -37,7 +39,7 @@
         </receiver>
 
         <service
-            android:name=".SMSService"
+            android:name=".SMSHelper"
             android:enabled="true"
             android:exported="false" />
 

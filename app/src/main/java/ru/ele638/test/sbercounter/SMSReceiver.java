@@ -11,17 +11,8 @@ public class SMSReceiver extends BroadcastReceiver {
 
     private static final String TAG = "SmsReceiverTag";
 
-    private static SMSReceiver instance = null;
-    private SMSService service;
-
-    public static boolean isReceiverStarted() {
-        return instance != null;
-    }
-
     public SMSReceiver() {
         super();
-        instance = this;
-        service = SMSService.getInstance();
         Log.d(TAG, "Receiver created");
     }
 
@@ -29,8 +20,9 @@ public class SMSReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         Bundle bundle = intent.getExtras();
         SmsMessage[] msgs;
-        if (bundle != null) {
+        SQLHelper dbHelper = new SQLHelper(context);
 
+        if (bundle != null) {
             String str = "";
             String sender = "";
             Object[] pdus = (Object[]) bundle.get("pdus");
@@ -39,11 +31,11 @@ public class SMSReceiver extends BroadcastReceiver {
             for (int i = 0; i < msgs.length; i++) {
                 msgs[i] = SmsMessage.createFromPdu((byte[]) pdus[i]);
                 sender = msgs[i].getOriginatingAddress();
-                if (sender.equals("900"))
+                if (sender != null && sender.equals("900"))
                     str += msgs[i].getMessageBody();
             }
             if (str.length() != 0 && sender.equals("900")) {
-                service.processIncomeSMS(str);
+                SMSHelper.processIncomeSMS(dbHelper, str);
             }
         }
     }

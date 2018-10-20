@@ -3,7 +3,6 @@ package ru.ele638.test.sbercounter;
 import android.Manifest;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
@@ -25,48 +24,15 @@ public class MainActivity extends AppCompatActivity {
 
     private final String TAG = "SMSMainActivity";
 
-    static SMSService service;
+    SQLHelper dbHelper;
     static RVAdapter rvAdapter;
     RecyclerView recyclerView;
     static ArrayList<Message> messages;
     static LoadTask loadTask;
     static ProgressDialog dialog;
 
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        recyclerView = findViewById(R.id.mainRV);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        rvAdapter = new RVAdapter();
-        if (messages == null)
-            messages = new ArrayList<>();
-
-        loadTask = new LoadTask();
-
-        dialog = new ProgressDialog(this);
-        dialog.setMessage("Loading");
-        dialog.setCancelable(false);
-        dialog.setTitle("Loading");
-
-        if (!hasReadSmsPermission()) {
-            showRequestPermissionsInfoAlertDialog();
-        } else if (SMSService.isServiceDown()) {
-            startService(new Intent(this, SMSService.class));
-        } else {
-            service = SMSService.getInstance();
-        }
-
-        if (service != null)
-            messages = service.getAllMessages();
-        rvAdapter.setMessages(messages);
-        if (messages.size() == 0)
-            Log.d(TAG, "Empty messages");
-        recyclerView.setAdapter(rvAdapter);
-        Log.d(TAG, "Started activity");
-
+    public static RVAdapter getRvAdapter() {
+        return rvAdapter;
     }
 
 
@@ -78,24 +44,30 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
 
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
+        recyclerView = findViewById(R.id.mainRV);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        rvAdapter = new RVAdapter();
+        messages = new ArrayList<>();
+
+        dbHelper = new SQLHelper(this);
+
+        rvAdapter.setMessages(messages);
+        recyclerView.setAdapter(rvAdapter);
+        dialog = new ProgressDialog(this);
+        dialog.setMessage("Loading");
+        dialog.setCancelable(false);
+        dialog.setTitle("Loading");
+
+        if (!hasReadSmsPermission()) {
+            showRequestPermissionsInfoAlertDialog();
         }
-        if (id == R.id.action_resetdb) {
-            service.dropDatabase();
-            reloadMessages();
-        }
-        if (id == R.id.action_readSMS) {
-            loadTask.execute();
-        }
-        return super.onOptionsItemSelected(item);
+        SMSHelper.getAllMessages(dbHelper, rvAdapter);
+
+        Log.d(TAG, "Started activity");
     }
 
     private boolean hasReadSmsPermission() {
@@ -136,14 +108,33 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // Handle action bar item clicks here. The action bar will
+        // automatically handle clicks on the Home/Up button, so long
+        // as you specify a parent activity in AndroidManifest.xml.
+        int id = item.getItemId();
+
+        //noinspection SimplifiableIfStatement
+        if (id == R.id.action_settings) {
+            return true;
+        }
+        if (id == R.id.action_resetdb) {
+            SMSHelper.dropDatabase(dbHelper);
+            reloadMessages();
+        }
+        if (id == R.id.action_readSMS) {
+            loadTask = new LoadTask();
+            loadTask.execute();
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
     public void onRequestPermissionsResult(int requestCode,
                                            String permissions[], int[] grantResults) {
         if (grantResults.length > 0
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            if (SMSService.isServiceDown()) {
-                startService(new Intent(this, SMSService.class));
-                service = SMSService.getInstance();
-            }
+            SMSHelper.getAllMessages(dbHelper, rvAdapter);
         } else {
             finish();
         }
@@ -151,11 +142,11 @@ public class MainActivity extends AppCompatActivity {
 
     public void reloadMessages() {
         messages.clear();
-        messages = SMSService.getInstance().getAllMessages();
+        SMSHelper.getAllMessages(dbHelper, rvAdapter);
         rvAdapter.notifyDataSetChanged();
     }
 
-    private class LoadTask extends AsyncTask {
+    private class LoadTask extends AsyncTask<Void, Integer, Void> {
 
         Integer size, current;
         String[] projection = {"address", "body"};
@@ -171,31 +162,41 @@ public class MainActivity extends AppCompatActivity {
             cursor.close();
             dialog.setMax(size);
             dialog.setProgress(0);
+            dialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
             dialog.show();
+            SMSHelper.dropDatabase(dbHelper);
+            RVAdapter.getMessages().clear();
         }
 
         @Override
-        protected Object doInBackground(Object[] objects) {
+        protected Void doInBackground(Void... voids) {
             Cursor cursor = getContentResolver().query(
                     Uri.parse("content://sms/inbox"), projection, selection, null, null);
             if (cursor.moveToFirst()) {
                 current = 0;
                 do {
-                    service.processIncomeSMS(cursor.getString(cursor.getColumnIndex("body")));
+                    SMSHelper.processIncomeSMS(dbHelper, cursor.getString(cursor.getColumnIndex("body")));
                     current++;
-                    dialog.setProgress(current);
+                    publishProgress(current);
                 } while (cursor.moveToNext());
             }
             cursor.close();
             return null;
         }
 
+        @Override
+        protected void onProgressUpdate(Integer[] values) {
+            super.onProgressUpdate(values);
+            dialog.setMessage("Loaded: " + values[0] + "/" + size);
+            dialog.setProgress(values[0]);
+        }
 
         @Override
-        protected void onPostExecute(Object o) {
-            super.onPostExecute(o);
-            messages = service.getAllMessages();
+        protected void onPostExecute(Void voids) {
+            super.onPostExecute(voids);
+            SMSHelper.getAllMessages(dbHelper, rvAdapter);
             dialog.dismiss();
         }
     }
+
 }

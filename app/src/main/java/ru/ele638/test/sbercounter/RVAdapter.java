@@ -13,10 +13,10 @@ import java.util.Locale;
 
 public class RVAdapter extends RecyclerView.Adapter<RVAdapter.RVVHolder> {
 
-    private ArrayList<Message> messages;
+    private static ArrayList<Message> messages;
 
-    public void setMessages(ArrayList<Message> inMessages){
-        this.messages = inMessages;
+    public static ArrayList<Message> getMessages() {
+        return messages;
     }
 
     @NonNull
@@ -27,6 +27,10 @@ public class RVAdapter extends RecyclerView.Adapter<RVAdapter.RVVHolder> {
                 .inflate(R.layout.card_layout, parent, false);
 
         return new RVVHolder(layout);
+    }
+
+    public void setMessages(ArrayList<Message> inMessages) {
+        messages = inMessages;
     }
 
     @Override

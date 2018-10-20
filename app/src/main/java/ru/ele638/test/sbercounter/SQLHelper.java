@@ -17,6 +17,7 @@ public class SQLHelper extends SQLiteOpenHelper {
     static final String TAG = "SMSSQLHelper";
 
     private static final String FILENAME = "sberCount.db";
+    private Context ctx;
 
     //messages table
     private static final String TABLE_NAME = "messages";
@@ -38,31 +39,12 @@ public class SQLHelper extends SQLiteOpenHelper {
     SQLHelper(Context ctx) {
         super(ctx, FILENAME, null, 3, null);
         getReadableDatabase();
+        this.ctx = ctx;
         Log.d(TAG, "Started");
     }
 
-    private void recreateDB(SQLiteDatabase db){
-        db.execSQL(String.format("DROP TABLE IF EXISTS %s", OP_TABLE_NAME));
-        db.execSQL(String.format("CREATE TABLE %s (" +
-                        "%s INTEGER PRIMARY KEY, " +
-                        "%s TEXT);",
-                OP_TABLE_NAME,
-                OP_ID,
-                OP_NAME));
-        db.execSQL(String.format("INSERT INTO %s (\'%s\') VALUES %s;",
-                OP_TABLE_NAME, OP_NAME, OP_VALUES));
-        db.execSQL(String.format("DROP TABLE IF EXISTS %s", TABLE_NAME)); //TEST
-        db.execSQL(String.format("CREATE TABLE %s (" +
-                        "%s INTEGER PRIMARY KEY, " +
-                        "%s TEXT, " +
-                        "%s DATETIME," +
-                        "%s INTEGER, " +
-                        "%s REAL, " +
-                        "%s TEXT, " +
-                        "%s REAL, " +
-                        "FOREIGN KEY(%s) REFERENCES %s(%s));",
-                TABLE_NAME, ID, CARD_NUMBER, DATETIME, OPERATION_TYPE,
-                SUMM, PLACE, BALANCE, OPERATION_TYPE, OP_TABLE_NAME, OP_ID));
+    public Context getContext() {
+        return ctx;
     }
 
     @Override
@@ -120,6 +102,30 @@ public class SQLHelper extends SQLiteOpenHelper {
         values.put(BALANCE, s.BALANCE);
         db.insert(TABLE_NAME, null, values);
         Log.d(TAG, "Added row to database");
+    }
+
+    private void recreateDB(SQLiteDatabase db) {
+        db.execSQL(String.format("DROP TABLE IF EXISTS %s", OP_TABLE_NAME));
+        db.execSQL(String.format("CREATE TABLE %s (" +
+                        "%s INTEGER PRIMARY KEY, " +
+                        "%s TEXT);",
+                OP_TABLE_NAME,
+                OP_ID,
+                OP_NAME));
+        db.execSQL(String.format("INSERT INTO %s (\'%s\') VALUES %s;",
+                OP_TABLE_NAME, OP_NAME, OP_VALUES));
+        db.execSQL(String.format("DROP TABLE IF EXISTS %s", TABLE_NAME)); //TEST
+        db.execSQL(String.format("CREATE TABLE %s (" +
+                        "%s INTEGER PRIMARY KEY, " +
+                        "%s TEXT, " +
+                        "%s DATETIME," +
+                        "%s INTEGER, " +
+                        "%s REAL, " +
+                        "%s TEXT, " +
+                        "%s REAL, " +
+                        "FOREIGN KEY(%s) REFERENCES %s(%s));",
+                TABLE_NAME, ID, CARD_NUMBER, DATETIME, OPERATION_TYPE,
+                SUMM, PLACE, BALANCE, OPERATION_TYPE, OP_TABLE_NAME, OP_ID));
     }
 
     public void dropDatabase() {
